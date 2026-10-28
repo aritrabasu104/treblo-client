@@ -12,13 +12,13 @@ you are authorized to access and respect provider refusals and verification.
 Install directly from this repository; no package-index account is required:
 
 ```sh
-python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.1.0"
+python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.0"
 ```
 
 For the optional browser adapter:
 
 ```sh
-python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.1.0"
+python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.0"
 ```
 
 The core client does not require Chrome, Playwright or an MCP server for API
@@ -110,21 +110,76 @@ Use the lower-level `client.download(...)` to securely retain an issued URL
 before transfer, then `stream_download(...)` to resume that exact URL. Do not
 automatically repeat a conversion after `OutcomeUnknown`.
 
-## Refresh and background use
+## Reuse a session and download in parallel
 
 ```python
-# Under your application's account lock:
-replacement = auth.renew(session)
-auth.verify(replacement)
-# Securely commit replacement before using it or releasing that lock.
-session = replacement
-client = TrebloClient(session)
+from treblo_client import SessionManager, MemorySessionStore, DownloadRequest
+
+# Memory storage lasts for this process. Use your secure-store adapter below
+# for reuse across scheduled runs. Share this manager across calling threads.
+manager = SessionManager(auth, MemorySessionStore())
+manager.login_with_google(PlaywrightBrowser())  # Opens one tab only if needed.
+
+results = manager.download_many([
+    DownloadRequest(first_track_id, Path("first.wav")),
+    DownloadRequest(second_track_id, Path("second.wav")),
+])  # Default: at most ten concurrent downloads; max_workers is configurable.
+for result in results:
+    if result.download:
+        print(result.download.path)
+    elif result.skipped:
+        print("Not started because an earlier operation failed")
+    else:
+        # Reconcile this operation before deciding whether it may be repeated.
+        handle_failure(result.request, result.error)
 ```
 
-Keep the separately owned session through your own secure credential store.
-Refresh tokens rotate. The package adds no token file, background refresh
-thread, scheduler, retry loop or implicit browser launch. After revocation or a
-required reauthentication, use the normal login flow again.
+The account lock covers session load, login, refresh and secure commit. It is
+released **before metadata, conversion or media transfers**. Each download uses
+an immutable session snapshot and independent HTTP transport. The lower-level
+HTTP transport also keeps its default opener local to each thread.
+
+An already verified session is reused without another login or verification GET
+on each download. A session within 90 seconds of expiry is refreshed once under
+the account lock. The replacement token pair is committed before verification
+or use. Waiting callers load that replacement; they do not rotate the old token
+again. Sessions already in use are not mutated underneath running requests.
+
+`get_session()`, `client()` and `download_file()` never open a browser.
+`login_with_google()` is explicit, serialized with refresh, and reuses an existing
+valid session. Only its owned authentication tab closes, before the lock releases.
+A lost login/refresh response retains its pending state and requires reconciliation
+without automatic replay. An explicit verification refusal remains blocked.
+
+For reuse across processes/scheduled runs, implement `SessionStore.load()` and
+atomic `save(SessionRecord)` using your secure credential store, then supply:
+
+```python
+from treblo_client import FileSessionLock
+
+manager = SessionManager(auth, your_secure_store,
+    lock=FileSessionLock(your_private_state_directory / "session.lock"))
+# Same secure store and canonical lock path in every process for this account.
+client = manager.client()
+```
+
+`FileSessionLock` supports POSIX systems and stores no credentials. The default
+in-memory lock coordinates one manager's threads only. On other platforms supply
+an equivalent account lock. Do not keep separate unsynchronized refresh-token
+copies. Store failures propagate; an earlier session is not a fallback around a
+current secure-store refusal. No plaintext token file, daemon or scheduler is added.
+
+`download_many()` validates distinct track/format and destination pairs before
+dispatch, runs at most `max_workers` tasks (default 10; range 1–32), stops admitting
+work when a failure is observed, joins already dispatched siblings and returns
+every result in input order. It never retries. Concurrent calls/batches are
+independent; your scheduler must prevent duplicate requests across them. The
+limit is a client setting, not a claim about provider capacity or rate limits.
+
+Applications with durable accounting can keep their own bounded executor and
+call `manager.client()` for each task. Use the existing conversion-intent and
+issued-URL APIs described above to preserve outcomes across process interruption.
+Direct `TrebloClient(session)` still uses a fixed snapshot and does not auto-refresh.
 
 ## API reference
 
@@ -133,6 +188,9 @@ required reauthentication, use the normal login flow again.
 | `AuthClient` | Password login, Google bootstrap, PKCE exchange, refresh, exact-account verification, local-only logout |
 | `Session`, `OAuthAttempt`, `SessionTransport` | Private token pair, PKCE state and origin-bound authentication |
 | `TrebloClient` | `current_user()`, `project(id)`, paginated `project_tracks(id)`, `track(id)`, conversion and `download_file()` |
+| `SessionManager`, `SessionRecord`, `SessionStore` | Short account coordination, secure-store contract, session reuse and serialized refresh |
+| `MemorySessionStore`, `FileSessionLock`, `SessionUnavailable` | Process-lifetime storage, optional POSIX coordination and a required login/reconciliation |
+| `DownloadRequest`, `DownloadResult`, `download_many` | Bounded parallel downloads with retained partial success and no retries |
 | `stream_download`, `Download` | Bounded transfer of an already issued media URL and byte receipt |
 | `HttpTransport` | Bounded JSON HTTP with an honest application User-Agent and no automatic retries |
 | `GenerationV3` | Request preparation for observed generation fields |

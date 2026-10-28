@@ -5,6 +5,7 @@ import json
 from http.client import HTTPException
 import re
 from typing import Any, Protocol
+import threading
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request as UrlRequest, build_opener
@@ -51,7 +52,18 @@ class _NoRedirect(HTTPRedirectHandler):
 class HttpTransport:
     def __init__(self, *, timeout: float = 60):
         self.timeout = timeout
-        self.opener = build_opener(_NoRedirect())
+        self._local = threading.local()
+
+    @property
+    def opener(self):
+        if not hasattr(self._local, "opener"):
+            self._local.opener = build_opener(_NoRedirect())
+        return self._local.opener
+
+    @opener.setter
+    def opener(self, value):
+        # Explicit adapters are scoped to the calling thread too.
+        self._local.opener = value
 
     def execute(self, request: Request) -> Response:
         origin = urlsplit(request.url)
@@ -62,7 +74,7 @@ class HttpTransport:
         body = None if request.body is None else json.dumps(
             request.body, allow_nan=False, separators=(",", ":")).encode()
         # Identify this application truthfully; do not impersonate a browser.
-        headers = {"User-Agent": "treblo-client/0.1.0", "Accept": "application/json"}
+        headers = {"User-Agent": "treblo-client/0.2.0", "Accept": "application/json"}
         if body is not None:
             headers["Content-Type"] = "application/json"
         headers.update(request.headers)

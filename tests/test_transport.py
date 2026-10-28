@@ -44,7 +44,7 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(TimeoutError):
             transport.execute(Request('GET', 'https://treblo.com/api/v1/users/me'))
         headers = dict(transport.opener.last_request.header_items())
-        self.assertEqual(headers['User-agent'], 'treblo-client/0.1.0')
+        self.assertEqual(headers['User-agent'], 'treblo-client/0.2.0')
         self.assertEqual(headers['Accept'], 'application/json')
 
     def test_observed_cloudflare_refusal_is_not_treated_as_a_login_retry(self):
