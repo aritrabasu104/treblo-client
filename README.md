@@ -30,6 +30,9 @@ Supply the website's current **public Supabase publishable key** through
 `TREBLO_PUBLIC_AUTH_KEY` or the `publishable_key` constructor argument. This is
 public application configuration, distinct from your password and session
 tokens. No account credentials or configured key values are bundled here.
+Obtain the current value from the website's public frontend configuration or
+the `apikey` header of its normal auth requests. Do not copy `Authorization`
+or `Cookie` headers as configuration.
 
 ```python
 import os
