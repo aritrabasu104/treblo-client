@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "treblo-client"
+version = "0.1.0"
+description = "Python client for Treblo authentication, metadata and audio downloads"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "aritrabasu104"}]
+keywords = ["treblo", "audio", "client", "oauth"]
+classifiers = ["Programming Language :: Python :: 3", "Operating System :: OS Independent"]
+dependencies = []
+
+[project.optional-dependencies]
+browser = ["playwright>=1.49,<2"]
+
+[project.urls]
+Homepage = "https://github.com/aritrabasu104/treblo-client"
+Documentation = "https://github.com/aritrabasu104/treblo-client#readme"
+Issues = "https://github.com/aritrabasu104/treblo-client/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+treblo_client = ["py.typed"]
