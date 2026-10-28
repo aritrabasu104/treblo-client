@@ -5,11 +5,22 @@ import math
 import os
 from pathlib import Path
 import struct
-from urllib.error import HTTPError
+from http.client import HTTPException
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import Request, build_opener
 
 from .transport import _NoRedirect
+
+
+class MediaAccessRefused(RuntimeError):
+    def __init__(self, status):
+        self.status = status
+        super().__init__(f"CDN media request refused with HTTP {status}")
+
+
+class MediaTransferError(RuntimeError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -80,8 +91,10 @@ def stream_download(url, destination, *, format, max_bytes=256 * 1024 * 1024,
             request = Request(url, headers={"User-Agent": "treblo-client/0.1.0", "Accept": "audio/*"})
             try:
                 response = (opener or build_opener(_NoRedirect())).open(request, timeout=timeout)
-            except HTTPError:
-                raise RuntimeError("CDN refused the media request") from None
+            except HTTPError as error:
+                if 400 <= error.code < 500:
+                    raise MediaAccessRefused(error.code) from None
+                raise MediaTransferError("CDN media response unavailable") from None
             with response:
                 if response.code != 200:
                     raise RuntimeError("CDN did not return a complete media response")
@@ -113,6 +126,9 @@ def stream_download(url, destination, *, format, max_bytes=256 * 1024 * 1024,
         finally:
             os.close(directory)
         return Download(target, digest.hexdigest(), size, format, duration)
+    except (URLError, HTTPException, TimeoutError, ConnectionError, OSError):
+        partial.unlink(missing_ok=True)
+        raise MediaTransferError("Media transfer interrupted; preserve the original issued URL") from None
     except BaseException:
         partial.unlink(missing_ok=True)
         raise

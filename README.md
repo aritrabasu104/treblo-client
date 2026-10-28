@@ -129,11 +129,13 @@ required reauthentication, use the normal login flow again.
 | --- | --- |
 | `AuthClient` | Password login, Google bootstrap, PKCE exchange, refresh, exact-account verification, local-only logout |
 | `Session`, `OAuthAttempt`, `SessionTransport` | Private token pair, PKCE state and origin-bound authentication |
-| `TrebloClient` | `current_user()`, `project(id)`, `track(id)`, conversion and `download_file()` |
+| `TrebloClient` | `current_user()`, `project(id)`, paginated `project_tracks(id)`, `track(id)`, conversion and `download_file()` |
 | `stream_download`, `Download` | Bounded transfer of an already issued media URL and byte receipt |
 | `HttpTransport` | Bounded JSON HTTP with an honest application User-Agent and no automatic retries |
 | `GenerationV3` | Request preparation for observed generation fields |
 | `ApiError`, `AccessRefused`, `OutcomeUnknown` | Explicit HTTP failure, access refusal and an uncertain mutation result |
+| `probe_audio` | Optional bounded local FFprobe metadata; no full-stream decode |
+| `MediaAccessRefused`, `MediaTransferError` | Non-retryable CDN refusal or sanitized interrupted transfer |
 
 Session issuance/refresh, authenticated reads, conversion and complete transfers
 have been exercised. Project creation and generation request builders are

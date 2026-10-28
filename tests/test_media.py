@@ -5,8 +5,10 @@ from pathlib import Path
 import tempfile
 import unittest
 import wave
+from urllib.error import HTTPError, URLError
+from unittest.mock import Mock
 
-from treblo_client import stream_download
+from treblo_client import stream_download, MediaAccessRefused, MediaTransferError
 
 
 class Response(io.BytesIO):
@@ -21,6 +23,16 @@ class Opener:
 
 
 class MediaTests(unittest.TestCase):
+    def test_access_refusal_and_transport_loss_never_expose_issued_url(self):
+        for error, expected in [(HTTPError('https://cdn.treblo.com/?private-secret',403,'forbidden',{},None),MediaAccessRefused),
+                                (URLError('https://cdn.treblo.com/?private-secret'),MediaTransferError)]:
+            with tempfile.TemporaryDirectory() as root:
+                opener=Mock();opener.open.side_effect=error
+                with self.assertRaises(expected) as caught:
+                    stream_download('https://cdn.treblo.com/?private-secret',Path(root).resolve()/'track.wav',format='wav',opener=opener)
+                self.assertNotIn('private-secret',str(caught.exception))
+                self.assertEqual(list(Path(root).iterdir()),[])
+
     def wav(self):
         data = io.BytesIO()
         with wave.open(data, 'wb') as audio:
