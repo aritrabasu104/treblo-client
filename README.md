@@ -12,13 +12,13 @@ you are authorized to access and respect provider refusals and verification.
 Install directly from this repository; no package-index account is required:
 
 ```sh
-python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.0"
+python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.1"
 ```
 
 For the optional browser adapter:
 
 ```sh
-python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.0"
+python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.1"
 ```
 
 The core client does not require Chrome, Playwright or an MCP server for API
@@ -191,6 +191,18 @@ Direct `TrebloClient(session)` still uses a fixed snapshot and does not auto-ref
 original attempt UUID, observed client version and a durable `before_dispatch`
 callback for each mutation. The client never retries a dispatched mutation.
 
+Exact HTTP 403 `turnstile_required`, `captcha_required` and
+`captcha_challenge_required` responses raise `VerificationRequired`, retaining
+the provider code and challenge kind. They do not mean the session expired.
+The client performs no verification, browser fallback or automatic retry.
+Applications can retain a bounded wait in their existing operation owner, but
+a successful account/status GET or elapsed time cannot prove clearance for a
+generation. Do not probe clearance by resubmitting generation each minute.
+Turnstile proofs are [single-use and valid for five minutes](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/).
+Treblo's separately authenticated [developer API](https://treblo.com/developers/docs)
+is a distinct integration; this session-based client never silently enrolls in
+it or switches billing/account scope.
+
 `owned_project_tracks(project_id, artist_id=...)` reads a complete, bounded
 project census in the service's display order. It verifies each track's account
 and project, rejects duplicate IDs and incomplete pagination, and performs GETs
@@ -219,7 +231,7 @@ provide their existing secure store, account lock and selected browser adapter.
 | `stream_download`, `Download` | Bounded transfer of an already issued media URL and byte receipt |
 | `HttpTransport` | Bounded JSON HTTP with an honest application User-Agent and no automatic retries |
 | `GenerationV3` | Request preparation for observed generation fields |
-| `ApiError`, `AccessRefused`, `OutcomeUnknown` | Explicit HTTP failure, access refusal and an uncertain mutation result |
+| `ApiError`, `AccessRefused`, `VerificationRequired`, `OutcomeUnknown` | Explicit HTTP failure, access refusal, provider challenge and an uncertain mutation result |
 | `probe_audio` | Optional bounded local FFprobe metadata; no full-stream decode |
 | `MediaAccessRefused`, `MediaTransferError` | Non-retryable CDN refusal or sanitized interrupted transfer |
 

@@ -30,6 +30,21 @@ class ApiError(RuntimeError):
         self.status, self.code = status, code
 
 
+class VerificationRequired(ApiError):
+    """A definite provider challenge; waiting or login is not clearance.
+
+    The caller retains its original operation and obtains verification through
+    the provider's supported flow. This exception never replays that request.
+    """
+    def __init__(self, code: str):
+        super().__init__(403, code)
+        self.verification_kind = {
+            "turnstile_required": "turnstile", "captcha_required": "passive",
+            "captcha_challenge_required": "challenge",
+        }[code]
+        self.retryable = False
+
+
 class TransportUnavailable(OSError):
     """A read failed without exposing credential-bearing transport diagnostics."""
 
@@ -78,7 +93,7 @@ class HttpTransport:
         body = None if request.body is None else json.dumps(
             request.body, allow_nan=False, separators=(",", ":")).encode()
         # Identify this application truthfully; do not impersonate a browser.
-        headers = {"User-Agent": "treblo-client/0.2.1", "Accept": "application/json"}
+        headers = {"User-Agent": "treblo-client/0.3.1", "Accept": "application/json"}
         if body is not None:
             headers["Content-Type"] = "application/json"
         headers.update(request.headers)
@@ -122,5 +137,8 @@ def require_success(response: Response) -> Any:
                 error.get("code") if isinstance(error, dict) else data.get("code"))
         if not isinstance(code, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,96}", code):
             code = "edge_or_access_refused" if response.status == 403 and response.data is None else "provider_error"
+        if response.status == 403 and code in {
+                "turnstile_required", "captcha_required", "captcha_challenge_required"}:
+            raise VerificationRequired(code)
         raise ApiError(response.status, code)
     return response.data

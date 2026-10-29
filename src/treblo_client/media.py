@@ -88,7 +88,7 @@ def stream_download(url, destination, *, format, max_bytes=256 * 1024 * 1024,
     descriptor = os.open(partial, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
     try:
         with os.fdopen(descriptor, "wb") as output:
-            request = Request(url, headers={"User-Agent": "treblo-client/0.2.1", "Accept": "audio/*"})
+            request = Request(url, headers={"User-Agent": "treblo-client/0.3.1", "Accept": "audio/*"})
             try:
                 response = (opener or build_opener(_NoRedirect())).open(request, timeout=timeout)
             except HTTPError as error:

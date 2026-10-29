@@ -4,7 +4,7 @@ from email.message import Message
 from urllib.error import HTTPError
 
 from treblo_client.protocol import Request
-from treblo_client.transport import AccessRefused, ApiError, HttpTransport, OutcomeUnknown, TransportUnavailable, Response, require_success
+from treblo_client.transport import AccessRefused, ApiError, HttpTransport, OutcomeUnknown, TransportUnavailable, Response, require_success, VerificationRequired
 
 
 class Opener:
@@ -44,7 +44,7 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(TransportUnavailable):
             transport.execute(Request('GET', 'https://treblo.com/api/v1/users/me'))
         headers = dict(transport.opener.last_request.header_items())
-        self.assertEqual(headers['User-agent'], 'treblo-client/0.2.1')
+        self.assertEqual(headers['User-agent'], 'treblo-client/0.3.1')
         self.assertEqual(headers['Accept'], 'application/json')
 
     def test_observed_cloudflare_refusal_is_not_treated_as_a_login_retry(self):
@@ -55,6 +55,18 @@ class TransportTests(unittest.TestCase):
         self.assertFalse(error.exception.retryable)
         self.assertTrue(error.exception.owner_action_required)
         self.assertEqual(error.exception.provider_error_code, 1010)
+
+    def test_exact_403_challenges_are_typed_without_replaying_or_renewing(self):
+        for code, kind in [('turnstile_required', 'turnstile'), ('captcha_required', 'passive'),
+                           ('captcha_challenge_required', 'challenge')]:
+            with self.subTest(code=code), self.assertRaises(VerificationRequired) as error:
+                require_success(Response(403, {'detail': code}))
+            self.assertEqual(error.exception.verification_kind, kind)
+            self.assertFalse(error.exception.retryable)
+        for status, code in [(500, 'turnstile_required'), (403, 'access_denied')]:
+            with self.subTest(status=status, code=code), self.assertRaises(ApiError) as error:
+                require_success(Response(status, {'detail': code}))
+            self.assertNotIsInstance(error.exception, VerificationRequired)
 
     def test_json_body_is_not_mislabeled_as_form_data_by_urllib(self):
         transport = HttpTransport(); transport.opener = Opener(TimeoutError())

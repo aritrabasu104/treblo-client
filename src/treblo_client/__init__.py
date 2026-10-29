@@ -4,14 +4,14 @@ from .client import TrebloClient
 from .media import Download, stream_download, MediaAccessRefused, MediaTransferError
 from .metadata import probe_audio
 from .protocol import GenerationV3
-from .transport import AccessRefused, ApiError, HttpTransport, OutcomeUnknown, TransportUnavailable
+from .transport import AccessRefused, ApiError, HttpTransport, OutcomeUnknown, TransportUnavailable, VerificationRequired
 from .sessions import (SessionManager, SessionStore, SessionRecord, MemorySessionStore,
                        FileSessionLock, SessionUnavailable, LoginRequired)
 from .parallel import DownloadRequest, DownloadResult, download_many
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = ["AuthClient", "OAuthAttempt", "Session", "SessionTransport", "TrebloClient",
            "GenerationV3", "Download", "stream_download", "HttpTransport", "ApiError",
-           "AccessRefused", "OutcomeUnknown", "TransportUnavailable", "probe_audio", "MediaAccessRefused", "MediaTransferError",
+           "AccessRefused", "VerificationRequired", "OutcomeUnknown", "TransportUnavailable", "probe_audio", "MediaAccessRefused", "MediaTransferError",
            "SessionManager", "SessionStore", "SessionRecord", "MemorySessionStore", "FileSessionLock",
            "SessionUnavailable", "LoginRequired", "DownloadRequest", "DownloadResult", "download_many"]
