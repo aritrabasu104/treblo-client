@@ -93,7 +93,7 @@ class HttpTransport:
         body = None if request.body is None else json.dumps(
             request.body, allow_nan=False, separators=(",", ":")).encode()
         # Identify this application truthfully; do not impersonate a browser.
-        headers = {"User-Agent": "treblo-client/0.3.1", "Accept": "application/json"}
+        headers = {"User-Agent": "treblo-client/0.3.2", "Accept": "application/json"}
         if body is not None:
             headers["Content-Type"] = "application/json"
         headers.update(request.headers)

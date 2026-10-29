@@ -12,13 +12,13 @@ you are authorized to access and respect provider refusals and verification.
 Install directly from this repository; no package-index account is required:
 
 ```sh
-python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.1"
+python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.2"
 ```
 
 For the optional browser adapter:
 
 ```sh
-python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.1"
+python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.2"
 ```
 
 The core client does not require Chrome, Playwright or an MCP server for API
@@ -198,7 +198,12 @@ describe this remaining boundary.
 Exact HTTP 403 `turnstile_required`, `captcha_required` and
 `captcha_challenge_required` responses raise `VerificationRequired`, retaining
 the provider code and challenge kind. They do not mean the session expired.
-The client performs no verification, browser fallback or automatic retry.
+The client performs no verification, browser fallback or ordinary automatic retry.
+An explicit `verification_handler` can return a fresh `VerificationProof` from
+the provider's normal widget. Pair it with `before_verification_dispatch` so the
+original owner records intent before the proof-bearing HTTP continuation. The
+same body, project and attempt ID are retained; proof reuse, repeated same-kind
+challenges and unknown mutation replay are rejected. See the linked flow above.
 Wait only when the existing operation has a real provider state to observe,
 such as an owned verification view or an accepted generation's task status.
 Rereading a local record every minute cannot observe provider clearance, and a
@@ -207,8 +212,8 @@ generation. Do not probe clearance by resubmitting generation each minute.
 
 The observed website frontend obtains a fresh generation proof and attaches
 `X-Captcha-Token` and `X-Captcha-Sitekey` to the original generation attempt.
-Its login verification uses a separate site key. This client does not implement
-that proof-return continuation. A healthy login therefore does not establish
+Its login verification uses a separate site key. The optional proof handler
+supplies that continuation without a second browser Generate. A healthy login therefore does not establish
 generation clearance, and the challenge alone must not initiate another login.
 Use normal HTTP refresh for an expiring session; interactive renewal is reserved
 for a definite expired-refresh rejection, as described below.

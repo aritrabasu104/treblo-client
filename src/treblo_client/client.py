@@ -1,7 +1,9 @@
 """Treblo API operations; native owners supply dispatch intents and transport."""
 
 from .protocol import Request, WEB_ORIGIN, GenerationV3, current_user, project, track, download_format
-from .transport import Transport, require_success, HttpTransport
+from .transport import Transport, require_success, HttpTransport, VerificationRequired
+from .verification import GenerationChallenge, VerificationProof
+from dataclasses import replace
 from .auth import Session, SessionTransport
 from .protocol import _identifier
 from urllib.parse import urlencode
@@ -76,12 +78,36 @@ class TrebloClient:
         return self._execute(request)
 
     def generate(self, configuration: GenerationV3, project_id, *, access_token,
-                 attempt_id, client_version, before_dispatch=None):
+                 attempt_id, client_version, before_dispatch=None,
+                 verification_handler=None, before_verification_dispatch=None):
+        if verification_handler is not None and (
+                not callable(verification_handler) or not callable(before_verification_dispatch)):
+            raise ValueError("Verification needs a normal-widget handler and original dispatch owner")
         request = configuration.prepare(project_id, access_token=access_token,
                                         attempt_id=attempt_id, client_version=client_version)
         if before_dispatch is not None:
             before_dispatch(request)
-        return self._execute(request)
+        prepared, used_kinds = request, set()
+        while True:
+            try:
+                return self._execute(prepared)
+            except VerificationRequired as error:
+                kind = error.verification_kind
+                if verification_handler is None or kind in used_kinds or len(used_kinds) == 3:
+                    raise
+                used_kinds.add(kind)
+                challenge = GenerationChallenge.for_request(
+                    request, project_id, attempt_id, kind, len(used_kinds), error.code)
+                proof = verification_handler(challenge)
+                if proof is None:
+                    raise
+                if not isinstance(proof, VerificationProof):
+                    raise ValueError("The normal verification handler returned no bound proof") from None
+                headers, dispatch = proof.consume(challenge)
+                prepared = replace(request, headers={**request.headers, **headers})
+                # The original owner commits the new physical intent before HTTP.
+                # An exception here consumes the proof but sends no continuation.
+                before_verification_dispatch(prepared, dispatch)
 
     def download(self, track_id, format, *, access_token, before_dispatch=None):
         request = download_format(track_id, format, access_token=access_token)

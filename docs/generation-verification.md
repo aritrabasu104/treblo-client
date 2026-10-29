@@ -23,8 +23,22 @@ that browser work. The website owns its actual verification flow. A timeout or
 uncertain acceptance does not qualify merely because browser transport exists.
 This package does not activate that backup automatically.
 
-The current SDK raises `VerificationRequired` and does not implement a standalone
-widget-to-request bridge. Keep its original operation and provider outcome.
+Version 0.3.2 supports an explicit genuine-proof continuation on `generate()`.
+Supply `verification_handler(challenge)` and
+`before_verification_dispatch(prepared_request, dispatch)`. The handler returns
+`VerificationProof(challenge, token, site_key, issued_at)` from the provider's
+normal widget, or `None` when verification remains incomplete. The dispatch
+callback commits the new physical intent before HTTP; `dispatch` exposes the
+original challenge and proof hash without exposing the proof value.
+
+The SDK preserves the original URL, body and attempt ID. It accepts a proof once,
+requires its exact original challenge and a lifetime shorter than five minutes,
+and stops if the same challenge kind is returned. Unknown mutation outcomes are
+never repeated. At most three distinct challenge kinds are supported within the
+same operation. Native controllers must retain these counters across restarts.
+The default remains a typed, non-retrying `VerificationRequired` when no handler
+is configured. Browser account validation, widget interaction, private IPC and
+tab cleanup belong to the caller's original native owner, not this HTTP package.
 Completing an unrelated login or repeating Generate to test clearance is not
 the missing bridge. Do not synthesize a proof or transfer session cookies.
 
