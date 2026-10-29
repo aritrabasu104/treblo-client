@@ -195,9 +195,19 @@ Exact HTTP 403 `turnstile_required`, `captcha_required` and
 `captcha_challenge_required` responses raise `VerificationRequired`, retaining
 the provider code and challenge kind. They do not mean the session expired.
 The client performs no verification, browser fallback or automatic retry.
-Applications can retain a bounded wait in their existing operation owner, but
-a successful account/status GET or elapsed time cannot prove clearance for a
+Wait only when the existing operation has a real provider state to observe,
+such as an owned verification view or an accepted generation's task status.
+Rereading a local record every minute cannot observe provider clearance, and a
+successful account/status GET or elapsed time cannot prove clearance for a
 generation. Do not probe clearance by resubmitting generation each minute.
+
+The observed website frontend obtains a fresh generation proof and attaches
+`X-Captcha-Token` and `X-Captcha-Sitekey` to the original generation attempt.
+Its login verification uses a separate site key. This client does not implement
+that proof-return continuation. A healthy login therefore does not establish
+generation clearance, and the challenge alone must not initiate another login.
+Use normal HTTP refresh for an expiring session; interactive renewal is reserved
+for a definite expired-refresh rejection, as described below.
 Turnstile proofs are [single-use and valid for five minutes](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/).
 Treblo's separately authenticated [developer API](https://treblo.com/developers/docs)
 is a distinct integration; this session-based client never silently enrolls in
