@@ -60,6 +60,10 @@ exchanges its own PKCE code over HTTP, verifies the exact expected account, and
 closes **only the tab it created**, in `finally`, after success, cancellation,
 timeout, rejected callback, token-exchange failure or account mismatch.
 
+The [detailed Google-login findings](docs/google-login.md) include fresh live
+verification of authorization, HTTP code exchange, refresh and local-only
+research-session cleanup, plus the limits of HTTP-only cold Google sign-in.
+
 ```python
 from treblo_client.browser import PlaywrightBrowser
 
