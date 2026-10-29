@@ -12,13 +12,13 @@ you are authorized to access and respect provider refusals and verification.
 Install directly from this repository; no package-index account is required:
 
 ```sh
-python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.1"
+python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.0"
 ```
 
 For the optional browser adapter:
 
 ```sh
-python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.1"
+python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.3.0"
 ```
 
 The core client does not require Chrome, Playwright or an MCP server for API
@@ -184,6 +184,27 @@ Applications with durable accounting can keep their own bounded executor and
 call `manager.client()` for each task. Use the existing conversion-intent and
 issued-URL APIs described above to preserve outcomes across process interruption.
 Direct `TrebloClient(session)` still uses a fixed snapshot and does not auto-refresh.
+
+## Generation and status without browser tabs
+
+`create_project()` and `generate(GenerationV3(...), ...)` use HTTP. Supply the
+original attempt UUID, observed client version and a durable `before_dispatch`
+callback for each mutation. The client never retries a dispatched mutation.
+
+`owned_project_tracks(project_id, artist_id=...)` reads a complete, bounded
+project census in the service's display order. It verifies each track's account
+and project, rejects duplicate IDs and incomplete pagination, and performs GETs
+only. Preserve a selected track ID across later reads; completion time and
+duration must not silently select a sibling.
+
+`SessionManager.get_session(browser=selected_browser)` first reuses a valid
+session or refreshes it through HTTP. It opens the supplied browser only after a
+definite expired-refresh rejection. Unknown rotation and access refusals remain
+fenced. Sign-in owns one temporary tab and closes it before returning a session
+for API use. A cleanup failure retains the returned pair in
+`login_cleanup_pending`; it cannot trigger another login or ordinary API work.
+Initial enrollment remains an explicit `login_with_google()` call. Applications
+provide their existing secure store, account lock and selected browser adapter.
 
 ## API reference
 

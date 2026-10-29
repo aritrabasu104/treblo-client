@@ -16,6 +16,10 @@ class SessionUnavailable(RuntimeError):
     """Login or reconciliation is required; do not silently repeat authentication."""
 
 
+class LoginRequired(SessionUnavailable):
+    """The provider definitively rejected an actually expired refresh grant."""
+
+
 @dataclass(frozen=True)
 class SessionRecord:
     session: Session | None = field(default=None, repr=False)
@@ -98,7 +102,7 @@ class SessionManager:
     def _current(self, record):
         if record is None:
             raise SessionUnavailable("Explicit login is required")
-        if record.state not in {"ready", "verification_required"} or record.session is None:
+        if record.state not in {"ready", "verification_required", "expired"} or record.session is None:
             raise SessionUnavailable("Original authentication requires reconciliation without replay")
         session = record.session
         if (not session.access_token or not session.refresh_token or not session.user_id
@@ -107,13 +111,27 @@ class SessionManager:
         auth = self._auth()
         if session.email != auth.expected_email:
             raise SessionUnavailable("Stored session belongs to another selected account")
+        if record.state == "expired":
+            if session.expires_at <= time.time():
+                raise LoginRequired("The expired session requires normal sign-in")
+            raise SessionUnavailable("Stored expiry state contradicts the original session")
         if record.state == "verification_required":
             self._verify(auth, session)
         if session.expires_at <= time.time() + self.refresh_margin:
             # Persist before dispatch. A lost refresh reply must not spend the
             # old rotating refresh token again, including after a restart.
             self.store.save(SessionRecord(session, "refresh_intent"))
-            session = auth.renew(session)
+            from .transport import ApiError
+            try:
+                session = auth.renew(session)
+            except ApiError as error:
+                if (error.status in {400, 401} and session.expires_at <= time.time()
+                        and error.code in {"invalid_grant", "refresh_token_not_found",
+                                           "refresh_token_expired", "session_expired"}):
+                    self.store.save(SessionRecord(session, "expired"))
+                    raise LoginRequired("The expired session requires normal sign-in") from None
+                # Unknown rotation and access refusals cannot commission login.
+                raise
             # Save the new pair before verification: a failed GET must never
             # send a caller back to an already consumed refresh token.
             self.store.save(SessionRecord(session, "verification_required"))
@@ -129,9 +147,15 @@ class SessionManager:
             raise
         self.store.save(SessionRecord(session))
 
-    def get_session(self) -> Session:
+    def get_session(self, *, browser=None, timeout=300) -> Session:
         with self.lock():
-            return self._current(self.store.load())
+            record = self.store.load()
+            try:
+                return self._current(record)
+            except LoginRequired:
+                if browser is None:
+                    raise
+                return self._login(browser, self.store.load(), timeout)
 
     def client(self):
         """A fresh HTTP transport using the current immutable session snapshot."""
@@ -142,11 +166,22 @@ class SessionManager:
         with self.lock():
             record = self.store.load()
             if record is not None:
-                return self._current(record)
-            self.store.save(SessionRecord(None, "login_intent"))
-            session = self._auth().login_with_google(browser, timeout=timeout)
-            self.store.save(SessionRecord(session))
-            return session
+                try:
+                    return self._current(record)
+                except LoginRequired:
+                    record = self.store.load()
+            return self._login(browser, record, timeout)
+
+    def _login(self, browser, previous, timeout):
+        # Retain the old pair and fence interruption before opening a tab.
+        self.store.save(SessionRecord(previous.session if previous else None, "login_intent"))
+        def authenticated(session):
+            self.store.save(SessionRecord(session, "login_cleanup_pending"))
+        session = self._auth().login_with_google(browser, timeout=timeout,
+                                                on_authenticated=authenticated)
+        # Returning from the auth client proves that its owned tab closed.
+        self.store.save(SessionRecord(session))
+        return session
 
     def download_file(self, track_id, destination, **options):
         return self.client().download_file(track_id, destination, **options)

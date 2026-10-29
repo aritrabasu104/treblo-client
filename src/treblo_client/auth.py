@@ -124,7 +124,7 @@ class AuthClient:
         self.transport, self.publishable_key = transport or HttpTransport(), key
         self.expected_email = expected_email
 
-    def login_with_google(self, browser, *, timeout: float = 300) -> Session:
+    def login_with_google(self, browser, *, timeout: float = 300, on_authenticated=None) -> Session:
         """Authorize in one owned tab and close it on every settled exit path.
 
         Browser adapters implement ``open(url)`` and return an object with
@@ -138,6 +138,8 @@ class AuthClient:
         try:
             callback = tab.wait_for_callback(OAUTH_RESEARCH_CALLBACK, timeout=timeout)
             session = self.exchange_callback(attempt, callback)
+            if on_authenticated is not None:
+                on_authenticated(session)
             self.verify(session)
             return session
         finally:

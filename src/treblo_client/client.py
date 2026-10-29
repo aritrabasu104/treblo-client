@@ -32,6 +32,42 @@ class TrebloClient:
             url += "?" + urlencode({"cursor": cursor})
         return self._execute(Request("GET", url, headers={"X-Treblo-Platform": "web"}))
 
+    def owned_project_tracks(self, project_id, *, artist_id, max_pages=4):
+        """Read a complete bounded project in the service's display order.
+
+        Preserve track IDs and order; callers retain their original selection.
+        A partial census, changed owner or duplicate ID never proves absence.
+        This performs GETs only and never opens a browser or retries a mutation.
+        """
+        if not artist_id or type(max_pages) is not int or not 1 <= max_pages <= 16:
+            raise ValueError("An exact owner and bounded page count are required")
+        item = self.project(project_id).get("entities", {}).get("projects", {}).get(project_id)
+        if not isinstance(item, dict) or item.get("id") != project_id or item.get("artistId") != artist_id:
+            raise ValueError("Project does not match the selected account")
+        tracks, cursor, seen, cursors = [], None, set(), set()
+        for _ in range(max_pages):
+            response = self.project_tracks(project_id, cursor=cursor)
+            data = response.get("data", {})
+            ids, entities = data.get("trackIds"), response.get("entities", {}).get("tracks", {})
+            if not isinstance(ids, list) or len(ids) > 200:
+                raise ValueError("Project track page is not bounded")
+            for track_id in ids:
+                _identifier(track_id)
+                track = entities.get(track_id)
+                if (track_id in seen or not isinstance(track, dict) or track.get("id") != track_id
+                        or track.get("projectId") != project_id or track.get("artistId") != artist_id):
+                    raise ValueError("Project track identity changed or repeated")
+                seen.add(track_id)
+                tracks.append(track)
+            following = data.get("nextCursor")
+            if following is None:
+                return tracks
+            if not isinstance(following, str) or not following or following in cursors:
+                raise ValueError("Project cursor changed or repeated")
+            cursors.add(following)
+            cursor = following
+        raise ValueError("Project track census exceeded its page bound")
+
     def create_project(self, title, *, before_dispatch=None):
         request = Request("POST", WEB_ORIGIN + "/api/v1/projects", {"title": title},
                           {"X-Treblo-Platform": "web"})
