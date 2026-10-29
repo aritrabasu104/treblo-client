@@ -23,7 +23,7 @@ OAUTH_RESEARCH_CALLBACK = WEB_ORIGIN + "/robots.txt"
 @dataclass(frozen=True)
 class Request:
     method: str
-    url: str
+    url: str = field(repr=False)
     body: dict[str, Any] | None = field(default=None, repr=False)
     headers: dict[str, str] = field(default_factory=dict, repr=False)
 

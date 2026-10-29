@@ -4,7 +4,7 @@ from treblo_client.protocol import GenerationV3, download_format, password_login
 
 PROJECT = "00000000-0000-4000-8000-000000000001"
 TRACK = "00000000-0000-4000-8000-000000000002"
-ATTEMPT = "8f81923d-681b-40a6-81a2-eed9ce9199d2"
+ATTEMPT = "00000000-0000-4000-8000-000000000003"
 
 
 class ProtocolTests(unittest.TestCase):

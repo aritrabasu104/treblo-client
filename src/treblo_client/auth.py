@@ -22,8 +22,8 @@ class Session:
     access_token: str = field(repr=False)
     refresh_token: str = field(repr=False)
     expires_at: float
-    user_id: str
-    email: str
+    user_id: str = field(repr=False)
+    email: str = field(repr=False)
     cookie_session: str = field(default="", repr=False, compare=False)
 
     @classmethod
@@ -86,7 +86,7 @@ class OAuthAttempt:
 class SessionTransport:
     """Use a login-issued JWT and SSR session on the original service origins.
 
-    No automatic refresh: the scheduler's existing account owner serializes
+    No automatic refresh: the application's account owner serializes
     rotation, commits the replacement securely, and supplies the current pair.
     """
     def __init__(self, transport: Transport, session: Session, *, storage_key: str = AUTH_STORAGE_KEY):

@@ -4,7 +4,7 @@ from email.message import Message
 from urllib.error import HTTPError
 
 from treblo_client.protocol import Request
-from treblo_client.transport import AccessRefused, ApiError, HttpTransport, OutcomeUnknown, Response, require_success
+from treblo_client.transport import AccessRefused, ApiError, HttpTransport, OutcomeUnknown, TransportUnavailable, Response, require_success
 
 
 class Opener:
@@ -41,10 +41,10 @@ class TransportTests(unittest.TestCase):
 
     def test_default_client_identifies_the_application_without_browser_impersonation(self):
         transport = HttpTransport(); transport.opener = Opener(TimeoutError())
-        with self.assertRaises(TimeoutError):
+        with self.assertRaises(TransportUnavailable):
             transport.execute(Request('GET', 'https://treblo.com/api/v1/users/me'))
         headers = dict(transport.opener.last_request.header_items())
-        self.assertEqual(headers['User-agent'], 'treblo-client/0.2.0')
+        self.assertEqual(headers['User-agent'], 'treblo-client/0.2.1')
         self.assertEqual(headers['Accept'], 'application/json')
 
     def test_observed_cloudflare_refusal_is_not_treated_as_a_login_retry(self):

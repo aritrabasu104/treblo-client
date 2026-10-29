@@ -88,13 +88,19 @@ def stream_download(url, destination, *, format, max_bytes=256 * 1024 * 1024,
     descriptor = os.open(partial, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
     try:
         with os.fdopen(descriptor, "wb") as output:
-            request = Request(url, headers={"User-Agent": "treblo-client/0.2.0", "Accept": "audio/*"})
+            request = Request(url, headers={"User-Agent": "treblo-client/0.2.1", "Accept": "audio/*"})
             try:
                 response = (opener or build_opener(_NoRedirect())).open(request, timeout=timeout)
             except HTTPError as error:
-                if 400 <= error.code < 500:
-                    raise MediaAccessRefused(error.code) from None
-                raise MediaTransferError("CDN media response unavailable") from None
+                try:
+                    if 400 <= error.code < 500:
+                        raise MediaAccessRefused(error.code) from None
+                    raise MediaTransferError("CDN media response unavailable") from None
+                finally:
+                    try:
+                        error.close()
+                    except Exception:
+                        pass
             with response:
                 if response.code != 200:
                     raise RuntimeError("CDN did not return a complete media response")

@@ -12,13 +12,13 @@ you are authorized to access and respect provider refusals and verification.
 Install directly from this repository; no package-index account is required:
 
 ```sh
-python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.0"
+python -m pip install "treblo-client @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.1"
 ```
 
 For the optional browser adapter:
 
 ```sh
-python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.0"
+python -m pip install "treblo-client[browser] @ git+https://github.com/aritrabasu104/treblo-client.git@v0.2.1"
 ```
 
 The core client does not require Chrome, Playwright or an MCP server for API
@@ -217,3 +217,9 @@ python -m pip wheel --no-deps . -w dist
 
 Tests use synthetic accounts and fake HTTP/browser responses. They never submit
 credentials or create provider content. MIT licensed.
+
+## Security and privacy
+
+See [SECURITY.md](SECURITY.md). The package contains generic API code and synthetic
+examples, with no account configuration. HTTP error tracebacks suppress private
+transport diagnostics; source privacy checks run with the test suite.

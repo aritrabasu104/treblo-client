@@ -30,6 +30,10 @@ class ApiError(RuntimeError):
         self.status, self.code = status, code
 
 
+class TransportUnavailable(OSError):
+    """A read failed without exposing credential-bearing transport diagnostics."""
+
+
 class OutcomeUnknown(RuntimeError):
     """A dispatched mutation has no conclusive response; reconcile, never replay."""
 
@@ -74,7 +78,7 @@ class HttpTransport:
         body = None if request.body is None else json.dumps(
             request.body, allow_nan=False, separators=(",", ":")).encode()
         # Identify this application truthfully; do not impersonate a browser.
-        headers = {"User-Agent": "treblo-client/0.2.0", "Accept": "application/json"}
+        headers = {"User-Agent": "treblo-client/0.2.1", "Accept": "application/json"}
         if body is not None:
             headers["Content-Type"] = "application/json"
         headers.update(request.headers)
@@ -97,10 +101,10 @@ class HttpTransport:
                 except (ValueError, UnicodeError):
                     data = None
                 return Response(response.code, data, headers)
-        except (URLError, TimeoutError, ConnectionError, OSError, HTTPException) as error:
+        except (URLError, TimeoutError, ConnectionError, OSError, HTTPException):
             if request.method not in {"GET", "HEAD"}:
-                raise OutcomeUnknown("Mutation response unavailable; original attempt requires reconciliation") from error
-            raise
+                raise OutcomeUnknown("Mutation response unavailable; original attempt requires reconciliation") from None
+            raise TransportUnavailable("Treblo read transport is temporarily unavailable") from None
 
 
 def require_success(response: Response) -> Any:
