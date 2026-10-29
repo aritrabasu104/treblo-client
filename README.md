@@ -185,11 +185,15 @@ call `manager.client()` for each task. Use the existing conversion-intent and
 issued-URL APIs described above to preserve outcomes across process interruption.
 Direct `TrebloClient(session)` still uses a fixed snapshot and does not auto-refresh.
 
-## Generation and status without browser tabs
+## Website generation, status and provider verification
 
 `create_project()` and `generate(GenerationV3(...), ...)` use HTTP. Supply the
 original attempt UUID, observed client version and a durable `before_dispatch`
 callback for each mutation. The client never retries a dispatched mutation.
+These use the website's service endpoints. HTTP transport does not remove a
+provider's per-generation verification requirement. The
+[verification flow and supported alternatives](docs/generation-verification.md)
+describe this remaining boundary.
 
 Exact HTTP 403 `turnstile_required`, `captcha_required` and
 `captcha_challenge_required` responses raise `VerificationRequired`, retaining
