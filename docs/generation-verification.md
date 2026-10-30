@@ -42,6 +42,14 @@ tab cleanup belong to the caller's original native owner, not this HTTP package.
 Completing an unrelated login or repeating Generate to test clearance is not
 the missing bridge. Do not synthesize a proof or transfer session cookies.
 
+Caller integrations that split browser work across tool calls must keep the
+continuation inside their original helper; a caller-local variable can disappear
+between those calls. Retain an incomplete phase's native identity and safe
+failure classification with the original rejection. A successful account read
+or temporary-tab closure validates that step only. Live caller checks have
+confirmed those two steps, but have not yet confirmed proof-bearing API
+acceptance; the SDK's continuation acceptance tests use synthetic responses.
+
 For a workflow requiring browser-free generation, Treblo documents
 [API-key authentication and generation task polling](https://treblo.com/developers/docs)
 at `https://api.treblo.com/v1`. That route needs its own developer key and credits.
