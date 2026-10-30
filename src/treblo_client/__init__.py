@@ -10,7 +10,7 @@ from .sessions import (SessionManager, SessionStore, SessionRecord, MemorySessio
                        FileSessionLock, SessionUnavailable, LoginRequired)
 from .parallel import DownloadRequest, DownloadResult, download_many
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __all__ = ["AuthClient", "OAuthAttempt", "Session", "SessionTransport", "TrebloClient",
            "GenerationV3", "GenerationChallenge", "VerificationProof", "VerificationDispatch",
            "Download", "stream_download", "HttpTransport", "ApiError",

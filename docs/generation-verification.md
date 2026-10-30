@@ -42,6 +42,15 @@ tab cleanup belong to the caller's original native owner, not this HTTP package.
 Completing an unrelated login or repeating Generate to test clearance is not
 the missing bridge. Do not synthesize a proof or transfer session cookies.
 
+Version 0.3.3 adds `resume_generation_verification()` for a retained first
+challenge whose owner has proved a definite rejection and no earlier proof
+dispatch. Supply the original configuration, project, attempt, challenge and
+the same two verification callbacks. It sends no unverified initial POST:
+only a fresh proof and committed native intent can continue the original body.
+Changed identities, later ordinals and mismatched bodies fail before HTTP.
+The native owner must reserve this continuation once and reconcile uncertain
+or returned work; this stateless SDK cannot supply that durable authority.
+
 Caller integrations that split browser work across tool calls must keep the
 continuation inside their original helper; a caller-local variable can disappear
 between those calls. Retain an incomplete phase's native identity and safe

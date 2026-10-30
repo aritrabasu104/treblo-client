@@ -87,27 +87,59 @@ class TrebloClient:
                                         attempt_id=attempt_id, client_version=client_version)
         if before_dispatch is not None:
             before_dispatch(request)
+        return self._generate_verified(request, project_id, attempt_id,
+            verification_handler, before_verification_dispatch)
+
+    def resume_generation_verification(self, configuration: GenerationV3, project_id, *,
+            access_token, attempt_id, client_version, challenge,
+            verification_handler, before_verification_dispatch):
+        """Continue a retained first challenge without another unverified POST.
+
+        The native owner must prove the original definite rejection and absence
+        of an earlier proof dispatch. Its durable journal retains that custody;
+        a challenge object alone never establishes provider acceptance/absence.
+        """
+        if not callable(verification_handler) or not callable(before_verification_dispatch):
+            raise ValueError("Verification needs a normal-widget handler and original dispatch owner")
+        request = configuration.prepare(project_id, access_token=access_token,
+                                        attempt_id=attempt_id, client_version=client_version)
+        if (not isinstance(challenge, GenerationChallenge) or challenge.ordinal != 1
+                or challenge.code not in {'turnstile_required', 'captcha_required', 'captcha_challenge_required'}
+                or VerificationRequired(challenge.code).verification_kind != challenge.kind
+                or challenge != GenerationChallenge.for_request(request, project_id, attempt_id,
+                    challenge.kind, 1, challenge.code)):
+            raise ValueError("The retained first challenge differs from the original generation")
+        return self._generate_verified(request, project_id, attempt_id,
+            verification_handler, before_verification_dispatch, challenge)
+
+    def _generate_verified(self, request, project_id, attempt_id, verification_handler,
+                           before_verification_dispatch, retained_challenge=None):
         prepared, used_kinds = request, set()
         while True:
-            try:
-                return self._execute(prepared)
-            except VerificationRequired as error:
-                kind = error.verification_kind
-                if verification_handler is None or kind in used_kinds or len(used_kinds) == 3:
-                    raise
-                used_kinds.add(kind)
-                challenge = GenerationChallenge.for_request(
-                    request, project_id, attempt_id, kind, len(used_kinds), error.code)
-                proof = verification_handler(challenge)
-                if proof is None:
-                    raise
-                if not isinstance(proof, VerificationProof):
-                    raise ValueError("The normal verification handler returned no bound proof") from None
-                headers, dispatch = proof.consume(challenge)
-                prepared = replace(request, headers={**request.headers, **headers})
-                # The original owner commits the new physical intent before HTTP.
-                # An exception here consumes the proof but sends no continuation.
-                before_verification_dispatch(prepared, dispatch)
+            if retained_challenge is not None:
+                error = VerificationRequired(retained_challenge.code)
+            else:
+                try:
+                    return self._execute(prepared)
+                except VerificationRequired as failure:
+                    error = failure
+            kind = error.verification_kind
+            if verification_handler is None or kind in used_kinds or len(used_kinds) == 3:
+                raise error
+            used_kinds.add(kind)
+            challenge = retained_challenge or GenerationChallenge.for_request(
+                request, project_id, attempt_id, kind, len(used_kinds), error.code)
+            retained_challenge = None
+            proof = verification_handler(challenge)
+            if proof is None:
+                raise error
+            if not isinstance(proof, VerificationProof):
+                raise ValueError("The normal verification handler returned no bound proof") from None
+            headers, dispatch = proof.consume(challenge)
+            prepared = replace(request, headers={**request.headers, **headers})
+            # The original owner commits the new physical intent before HTTP.
+            # An exception here consumes the proof but sends no continuation.
+            before_verification_dispatch(prepared, dispatch)
 
     def download(self, track_id, format, *, access_token, before_dispatch=None):
         request = download_format(track_id, format, access_token=access_token)

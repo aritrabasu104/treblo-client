@@ -110,3 +110,48 @@ class GenerationVerificationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.generate(verification_handler=self.proof, before_verification_dispatch=failed)
         self.assertEqual(len(self.requests), 1)
+
+    def resume(self, challenge, **kwargs):
+        return self.client.resume_generation_verification(
+            GenerationV3(prompt='Original', lyrics='Exact lyrics'), PROJECT,
+            access_token='synthetic-access', attempt_id=ATTEMPT,
+            client_version='observed-version', challenge=challenge,
+            verification_handler=kwargs.get('verification_handler', self.proof),
+            before_verification_dispatch=kwargs.get('before_verification_dispatch', self.journal))
+
+    def retained_challenge(self):
+        from treblo_client import GenerationChallenge
+        request=GenerationV3(prompt='Original',lyrics='Exact lyrics').prepare(PROJECT,
+            access_token='synthetic-access',attempt_id=ATTEMPT,client_version='observed-version')
+        return GenerationChallenge.for_request(request,PROJECT,ATTEMPT,'turnstile',1,'turnstile_required')
+
+    def test_retained_first_challenge_sends_only_its_proof_bearing_continuation(self):
+        self.responses=[Response(200,{'track_ids':['a','b']})]
+        self.assertEqual(self.resume(self.retained_challenge()),{'track_ids':['a','b']})
+        self.assertEqual(self.events,['widget','verification-intent','http'])
+        self.assertEqual(len(self.requests),1)
+        self.assertIn('X-Captcha-Token',self.requests[0].headers)
+
+    def test_incomplete_retained_verification_sends_no_http(self):
+        with self.assertRaises(VerificationRequired):
+            self.resume(self.retained_challenge(),verification_handler=lambda c:None)
+        self.assertEqual(self.requests,[])
+
+    def test_changed_retained_operation_or_ordinal_never_calls_widget_or_http(self):
+        for values in ({'request_sha256':'0'*64},{'attempt_id':PROJECT},{'ordinal':2},
+                {'kind':'passive'},{'code':'unknown-code'}):
+            with self.assertRaises(ValueError):self.resume(replace(self.retained_challenge(),**values))
+        self.assertEqual((self.events,self.requests),([],[]))
+
+    def test_resumed_same_kind_refusal_has_one_widget_and_one_http_only(self):
+        with self.assertRaises(VerificationRequired):self.resume(self.retained_challenge())
+        self.assertEqual(self.events,['widget','verification-intent','http'])
+
+    def test_resumed_unknown_or_failed_intent_never_adds_another_post(self):
+        self.responses=[OutcomeUnknown('Synthetic proof response lost')]
+        with self.assertRaises(OutcomeUnknown):self.resume(self.retained_challenge())
+        self.assertEqual(len(self.requests),1)
+        self.requests.clear()
+        def refused(*args):raise OSError('Synthetic native journal failure')
+        with self.assertRaises(OSError):self.resume(self.retained_challenge(),before_verification_dispatch=refused)
+        self.assertEqual(self.requests,[])
